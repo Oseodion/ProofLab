@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Suspense } from "react";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { themeBootScript } from "@/lib/theme";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -20,8 +21,7 @@ export const metadata: Metadata = {
     default: "ProofLab",
     template: "%s · ProofLab",
   },
-  description:
-    "From web data attestation to verifiable computation — without confusing the two.",
+  description: "From web data attestation to verifiable computation without confusing the two",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -29,7 +29,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
+      </head>
       <body className="flex min-h-full flex-col bg-background text-foreground">
         <a
           href="#content"

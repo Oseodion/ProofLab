@@ -1,6 +1,6 @@
 # ProofLab
 
-ProofLab is a developer studio for the Primus zkTLS attestation flow, plus a separate panel for DVC (data verification and computation). The tagline is the product rule: from web data attestation to verifiable computation, without confusing the two.
+ProofLab is a developer studio for the Primus zkTLS attestation flow, plus a separate panel for DVC (data verification and computation). The tagline is the product rule: From web data attestation to verifiable computation without confusing the two
 
 A verified result on this site means `verifyAttestation` returned `true`. That is a zkTLS attestation. It is not a zkVM computation proof. The computation panel talks to a DVC service only when `DVC_SERVICE_URL` is set, and it shows that service’s JSON as the service returned it.
 

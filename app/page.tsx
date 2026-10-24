@@ -23,11 +23,15 @@ const DVC_STEPS = [
 export default function HomePage() {
   return (
     <PageShell
-      eyebrow="Primus Epoch 2"
-      title="From web data attestation to verifiable computation — without confusing the two."
-      lede="ProofLab runs the enterprise zkTLS attestation flow from the Primus production example. A second panel can submit that data to a DVC service when you configure one. Each result is labeled with the check that actually ran."
+      title="Primus"
+      lede="From web data attestation to verifiable computation without confusing the two"
     >
       <div className="grid gap-10">
+        <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+          ProofLab runs the enterprise zkTLS attestation flow from the Primus production example. A
+          second panel can submit that data to a DVC service when you configure one. Each result is
+          labeled with the check that actually ran.
+        </p>
         <div className="grid gap-4 lg:grid-cols-2">
           <article className="rounded-lg border border-border bg-card p-5">
             <p className="font-mono text-xs text-primary">Step 1 · live path</p>

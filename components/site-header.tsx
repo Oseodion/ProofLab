@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const NAV = [
   { href: "/", label: "Workflow" },
@@ -20,21 +21,24 @@ export function SiteHeader() {
         <Link href="/" className="text-base font-semibold tracking-tight">
           ProofLab
         </Link>
-        <nav aria-label="Primary" className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
-          {NAV.map((item) => {
-            const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                className={active ? "text-foreground" : "text-muted-foreground hover:text-foreground"}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <nav aria-label="Primary" className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+            {NAV.map((item) => {
+              const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={active ? "text-foreground" : "text-muted-foreground hover:text-foreground"}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+          <ThemeToggle />
+        </div>
       </div>
     </header>
   );
