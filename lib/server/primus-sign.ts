@@ -10,6 +10,8 @@ export async function signWithPrimus(
   appSecret: string,
   signParams: string,
 ): Promise<string> {
+  // Dynamic import on purpose. A static import is emitted as require() for this
+  // ESM-only package and fails on the server with ERR_REQUIRE_ESM.
   const { PrimusZKTLS } = await import("@primuslabs/zktls-js-sdk");
   const primusZKTLS = new PrimusZKTLS();
   await primusZKTLS.init(appId, appSecret);

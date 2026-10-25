@@ -10,8 +10,11 @@ const nextConfig: NextConfig = {
     // forms fall through to a native GET and status stays at the SSR default.
     reactDebugChannel: false,
   },
-  // Keep the SDK on Node's resolver in Route Handlers. sign() uses ethers and must not be bundled into the client by the server compile.
-  serverExternalPackages: ["@primuslabs/zktls-js-sdk"],
+  // @primuslabs/zktls-js-sdk is ESM-only. serverExternalPackages loads opted-out
+  // packages with Node require(), which throws ERR_REQUIRE_ESM on Vercel.
+  // Bundle the SDK (and @solana/web3.js, whose CJS build require()s ESM uuid).
+  // ethers is CJS and stays external for sign().
+  serverExternalPackages: ["ethers"],
   turbopack: {
     rules: {
       "*.css": {

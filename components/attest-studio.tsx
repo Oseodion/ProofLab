@@ -155,9 +155,9 @@ export function AttestStudio({ defaultTemplateId }: { defaultTemplateId: string 
             className="h-10 font-mono"
           />
           <p className="text-sm leading-6 text-muted-foreground">
-            UUID from the <ExternalLink href={links.marketplace}>marketplace</ExternalLink> or your
-            Dev Hub project. Optional default: NEXT_PUBLIC_DEFAULT_TEMPLATE_ID or
-            DEFAULT_ATT_TEMPLATE_ID.
+            UUID from the{" "}
+            <ExternalLink href={links.marketplace}>Primus marketplace</ExternalLink> or your own{" "}
+            <ExternalLink href={links.devHubProjects}>Dev Hub project</ExternalLink>.
           </p>
         </div>
 
@@ -190,8 +190,7 @@ export function AttestStudio({ defaultTemplateId }: { defaultTemplateId: string 
             className="min-h-28 font-mono"
           />
           <p className="text-sm leading-6 text-muted-foreground">
-            Optional JSON object. Passed to setAdditionParams as a JSON string. Leave empty to omit
-            it.
+            Optional JSON object. Keys come from the chosen template. Leave empty to omit it.
           </p>
         </div>
 
@@ -208,7 +207,9 @@ export function AttestStudio({ defaultTemplateId }: { defaultTemplateId: string 
             <option value="mpctls">mpctls</option>
           </select>
           <p className="text-sm leading-6 text-muted-foreground">
-            Passed to setAttMode. The production example uses proxytls. mpctls selects MPC-TLS.
+            proxytls is standard TLS via proxy (the default, used by the{" "}
+            <ExternalLink href={links.productionExample}>production example</ExternalLink>). mpctls
+            is MPC-TLS.
           </p>
         </div>
 
