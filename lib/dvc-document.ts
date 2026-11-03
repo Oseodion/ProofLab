@@ -300,6 +300,19 @@ export function interpretDvcResult(body: unknown): DvcInterpretation {
     };
   }
 
+  if (!serviceStatus && payload.truncated === true && typeof payload.raw === "string") {
+    return {
+      serviceStatus,
+      proverVerified: false,
+      proofPresent: false,
+      publicValues: null,
+      detail:
+        typeof payload.message === "string"
+          ? payload.message
+          : "The DVC response was not JSON ProofLab could read. Only a preview is shown.",
+    };
+  }
+
   if (typeof payload.error === "string" && !serviceStatus) {
     return {
       serviceStatus,
