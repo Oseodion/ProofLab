@@ -34,6 +34,7 @@ describe("parseAttestForm", () => {
     if (parsed.ok) {
       expect(parsed.value.additionParams).toBe('{"page":1}');
       expect(parsed.value.algorithmType).toBe("mpctls");
+      expect(parsed.value.retainForDvc).toBe(true);
     }
   });
 

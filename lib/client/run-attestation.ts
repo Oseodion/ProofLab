@@ -1,4 +1,5 @@
 import type { PrimusZKTLS } from "@primuslabs/zktls-js-sdk";
+import type { DvcMaterial } from "@/lib/dvc-document";
 import { formatUnknownError } from "@/lib/format-error";
 import type { AttestPhase } from "@/lib/types";
 import { parseAttestForm, type AttestFormInput } from "@/lib/validation";
@@ -15,6 +16,11 @@ export type AttestationRunResult = {
   attestation: unknown | null;
   error: string | null;
   phase: AttestPhase;
+  /**
+   * Present only after verifyAttestation returns true, and only when the SDK
+   * kept privateData or allJsonResponse. Null means nothing was retained.
+   */
+  dvcMaterial: DvcMaterial | null;
 };
 
 type Deps = {
@@ -31,6 +37,20 @@ function failed(phase: AttestPhase, message: string): AttestationRunResult {
     attestation: null,
     error: message,
     phase,
+    dvcMaterial: null,
+  };
+}
+
+function collectDvcMaterial(primus: PrimusZKTLS, requestId: string): DvcMaterial | null {
+  const allJsonResponse =
+    typeof primus.getAllJsonResponse === "function" ? primus.getAllJsonResponse(requestId) : undefined;
+  const privateData =
+    typeof primus.getPrivateData === "function" ? primus.getPrivateData(requestId) : undefined;
+  if (allJsonResponse == null && privateData == null) return null;
+  return {
+    requestId,
+    allJsonResponse: allJsonResponse ?? null,
+    privateData: privateData ?? null,
   };
 }
 
@@ -72,6 +92,7 @@ export async function runAttestation(
 
   mark("request");
   let requestStr: string;
+  let requestId = "";
   try {
     const request = deps.primus.generateRequestParams(
       form.value.templateId,
@@ -81,6 +102,10 @@ export async function runAttestation(
       request.setAdditionParams(form.value.additionParams);
     }
     request.setAttMode({ algorithmType: form.value.algorithmType });
+    if (form.value.retainForDvc) {
+      request.setAllJsonResponseFlag("true");
+    }
+    requestId = typeof request.requestid === "string" ? request.requestid : "";
     requestStr = request.toJsonString();
   } catch (error) {
     return failed("request", formatUnknownError(error));
@@ -114,6 +139,7 @@ export async function runAttestation(
       verifyResult: null,
       attestation,
       error: formatUnknownError(error),
+      dvcMaterial: null,
       phase: "verify",
     };
   }
@@ -128,6 +154,7 @@ export async function runAttestation(
       status === "unverified"
         ? "verifyAttestation returned false. This record is unverified."
         : null,
+    dvcMaterial: status === "verified" ? collectDvcMaterial(deps.primus, requestId) : null,
     phase: "done",
   };
 }

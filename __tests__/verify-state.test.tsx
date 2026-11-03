@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PrimusZKTLS } from "@primuslabs/zktls-js-sdk";
 import { AttestationResult } from "@/components/attestation-result";
 import { runAttestation } from "@/lib/client/run-attestation";
@@ -8,6 +8,11 @@ import { statusFromVerifyResult } from "@/lib/verify-state";
 
 const TEMPLATE = "2e3160ae-8b1e-45e3-8c59-426366278b9d";
 const ADDRESS = "0x7ab44DE0156925fe0c24482a2cDe48C465e47573";
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe("verifyAttestation false", () => {
   it("maps a false result to the unverified status", () => {
@@ -18,8 +23,10 @@ describe("verifyAttestation false", () => {
 
   it("keeps the attestation unverified in the runner and the result view", async () => {
     const request = {
+      requestid: "6f1d7c2e-1b4a-4e5f-9c8d-0a1b2c3d4e5f",
       setAdditionParams: vi.fn(),
       setAttMode: vi.fn(),
+      setAllJsonResponseFlag: vi.fn(),
       toJsonString: () => "{}",
     };
     const primus = {
@@ -56,6 +63,8 @@ describe("verifyAttestation false", () => {
 
     expect(result.status).toBe("unverified");
     expect(result.verifyResult).toBe(false);
+    expect(result.dvcMaterial).toBeNull();
+    expect(request.setAllJsonResponseFlag).toHaveBeenCalledWith("true");
     expect(primus.verifyAttestation).toHaveBeenCalledOnce();
 
     const task: AttestationTask = {
@@ -79,5 +88,48 @@ describe("verifyAttestation false", () => {
     expect(pill).toHaveTextContent("Unverified");
     expect(screen.getByText(/this record is unverified/i)).toBeInTheDocument();
     expect(screen.getByText("zkTLS attestation")).toBeInTheDocument();
+    expect(screen.queryByText("Verifiable computation")).not.toBeInTheDocument();
+  });
+
+  it("blocks a verified reveal from being submitted as DVC input", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify({
+            configured: false,
+            missing: ["DVC_SERVICE_URL"],
+            programId: null,
+            message: "DVC submit is unavailable. Missing environment variable: DVC_SERVICE_URL.",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      ),
+    );
+
+    const task: AttestationTask = {
+      id: "6f1d7c2e-1b4a-4e5f-9c8d-0a1b2c3d4e5f",
+      kind: "zktls-attestation",
+      createdAt: "2026-10-24T12:00:00.000Z",
+      updatedAt: "2026-10-24T12:00:00.000Z",
+      templateId: TEMPLATE,
+      userAddress: ADDRESS,
+      algorithmType: "proxytls",
+      additionParams: null,
+      status: "verified",
+      verifyResult: true,
+      error: null,
+      attestation: {
+        recipient: ADDRESS,
+        data: JSON.stringify({ screen_name: "web3_tech_" }),
+        signatures: ["0xabc"],
+        attestors: [],
+      },
+    };
+
+    render(<AttestationResult task={task} />);
+    expect(await screen.findByText(/cannot be submitted as DVC input/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Submit task" })).toBeDisabled();
+    expect(screen.getAllByText(/Missing environment variable: DVC_SERVICE_URL/).length).toBeGreaterThan(0);
   });
 });

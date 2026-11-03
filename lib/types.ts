@@ -27,6 +27,8 @@ export type ComputeTask = {
   serviceTaskId: string | null;
   status: Extract<UiStatus, "pending" | "failed" | "unavailable" | "done">;
   serviceStatus: string | null;
+  /** True only when the service payload included a proof fixture and the prover verify line. */
+  proverVerified: boolean | null;
   error: string | null;
   response: unknown | null;
 };

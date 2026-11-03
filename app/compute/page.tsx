@@ -37,12 +37,16 @@ function availabilitySnapshot(body: Record<string, unknown>): Availability {
       : [],
     invalid: body.invalid === true ? true : undefined,
     message: typeof body.message === "string" ? body.message : undefined,
+    programId: typeof body.programId === "string" ? body.programId : null,
+    programIdInvalid: body.programIdInvalid === true,
   };
 }
 
 async function ComputeContent() {
   await bindRequest();
-  const availability = availabilitySnapshot(dvcAvailability(readEnv("DVC_SERVICE_URL")).body);
+  const availability = availabilitySnapshot(
+    dvcAvailability(readEnv("DVC_SERVICE_URL"), readEnv("DVC_PROGRAM_ID")).body,
+  );
   return (
     <PageShell
       eyebrow="DVC computation"
@@ -55,9 +59,9 @@ async function ComputeContent() {
           <p>
             In <ExternalLink href={links.dvcDemo}>primus-labs/DVC-Demo</ExternalLink>, the client
             first obtains a zkTLS attestation, recovers plaintext locally, and builds an
-            attestation_data JSON document. That document carries public_data from the attestors,
-            private_data for the hash or commitment check, and verification_type such as
-            HASH_COMPARISON or GRUMPKIN_COMMITMENT.
+            attestation_data JSON document. The network-succinct verifier accepts verification_type
+            HASH_COMPARSION, with private_data.plain_json_response, or AES_DECRYPTION, with
+            private_data.aes_key. The hash type is spelled HASH_COMPARSION in that crate.
           </p>
           <p>
             POST /submitTask sends program_id and attestation_data as form fields. The service
@@ -66,15 +70,19 @@ async function ComputeContent() {
             used by that service are queued, running, done, and error.
           </p>
           <p>
-            The guest is expected to call its attestation verifier before the business predicate.
-            The SNARK is what a verifier contract checks. ProofLab displays the service JSON and
-            does not run that check. Enterprise attestation JSON and this DVC attestation_data
-            document are different shapes. See the{" "}
-            <ExternalLink href={links.enterpriseAttestation}>enterprise attestation structure</ExternalLink>{" "}
-            and the <ExternalLink href={links.dvcDocs}>DVC docs</ExternalLink>.
+            The guest verifies the attestation, then runs its predicate. The Succinct prover in
+            DVC-Demo verifies the SNARK before it writes proof_fixture.json. ProofLab marks prover
+            verification only when that fixture and the line Successfully verified proof! are both
+            in the service payload. It does not run an SP1 verifier of its own. A verified studio
+            attestation is submitted from its result page when it is already a Network document or
+            an enterprise ciphertext object with aes_key. A reveal such as a plaintext screen_name
+            is not rewritten into either shape.
           </p>
         </section>
-        <ComputePanel initialAvailability={availability} />
+        <ComputePanel
+          initialAvailability={availability}
+          initialProgramId={availability.programId ?? ""}
+        />
       </div>
     </PageShell>
   );

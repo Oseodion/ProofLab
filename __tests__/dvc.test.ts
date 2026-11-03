@@ -4,6 +4,16 @@ import { dvcAvailability, submitToDvc } from "@/lib/server/dvc";
 const PROGRAM = "2e3160ae-8b1e-45e3-8c59-426366278b9d";
 
 describe("DVC proxy", () => {
+  it("prefills a UUID program id and ignores a non-UUID", () => {
+    const ready = dvcAvailability("https://dvc.example", PROGRAM);
+    expect(ready.body.programId).toBe(PROGRAM);
+    expect(String(ready.body.message)).toContain("DVC_PROGRAM_ID is prefilled");
+
+    const bad = dvcAvailability("https://dvc.example", "elf");
+    expect(bad.body.programId).toBeNull();
+    expect(bad.body.programIdInvalid).toBe(true);
+  });
+
   it("reports the missing DVC_SERVICE_URL and does not call the network", async () => {
     const status = dvcAvailability(undefined);
     expect(status.body.missing).toEqual(["DVC_SERVICE_URL"]);

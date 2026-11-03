@@ -4,6 +4,8 @@ export const links = {
   extension:
     "https://chromewebstore.google.com/detail/primus/oeiomhmbaapihbilkfkhmlajkeegnjhe",
   dvcDocs: "https://docs.primuslabs.xyz/build/dvc/",
+  dvcIntro: "https://github.com/primus-labs/DVC-Intro",
+  dvcAttestationVerify: "https://github.com/primus-labs/zktls-att-verification",
   enterpriseSdk: "https://docs.primuslabs.xyz/enterprise/zk-tls-sdk/",
   enterpriseAttestation:
     "https://docs.primuslabs.xyz/enterprise/attestation-structure/",

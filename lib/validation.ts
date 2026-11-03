@@ -14,6 +14,7 @@ export type AttestFormInput = {
   userAddress: string;
   additionParams: string;
   algorithmType: string;
+  retainForDvc?: boolean;
 };
 
 export type AttestFormValue = {
@@ -21,6 +22,7 @@ export type AttestFormValue = {
   userAddress: string;
   additionParams: string | null;
   algorithmType: AlgorithmType;
+  retainForDvc: boolean;
 };
 
 export type FieldError = { ok: false; message: string };
@@ -92,7 +94,13 @@ export function parseAttestForm(input: AttestFormInput): FieldOk<AttestFormValue
 
   return {
     ok: true,
-    value: { templateId, userAddress, additionParams, algorithmType },
+    value: {
+      templateId,
+      userAddress,
+      additionParams,
+      algorithmType,
+      retainForDvc: input.retainForDvc !== false,
+    },
   };
 }
 

@@ -14,10 +14,10 @@ const ATTEST_STEPS = [
 ];
 
 const DVC_STEPS = [
-  { name: "Attestation data", detail: "After a Network zkTLS run, the client builds public_data, private_data, and verification_type. Plaintext is recovered locally." },
+  { name: "Attestation data", detail: "A verified studio result is packed only when it is already a Network document or an enterprise ciphertext attestation with aes_key. A revealed field is not wrapped as private data." },
   { name: "Program", detail: "A Rust guest for Succinct is compiled to an ELF and uploaded. uploadProgram returns program_id. The guest verifies the attestation, then runs the predicate." },
   { name: "submitTask", detail: "POST form fields program_id and attestation_data. The service queues the task." },
-  { name: "getResult", detail: "Poll with task_id. Status moves queued, running, done, or error. A done payload can include a proof fixture." },
+  { name: "getResult", detail: "Poll with task_id. Prover verification requires status done, a proof fixture, and the line Successfully verified proof!." },
 ];
 
 export default function HomePage() {

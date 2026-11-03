@@ -24,15 +24,30 @@ async function readUpstream(response: Response): Promise<unknown> {
   }
 }
 
-export function dvcAvailability(raw: string | undefined): DvcHandlerResult {
+function programIdField(raw: string | undefined): { programId: string | null; programIdInvalid: boolean } {
+  if (!raw?.trim()) return { programId: null, programIdInvalid: false };
+  const trimmed = raw.trim();
+  if (!isUuid(trimmed)) return { programId: null, programIdInvalid: true };
+  return { programId: trimmed, programIdInvalid: false };
+}
+
+export function dvcAvailability(raw: string | undefined, programIdRaw?: string): DvcHandlerResult {
+  const program = programIdField(programIdRaw);
   const parsed = parseDvcBase(raw);
   if (parsed.ok) {
+    const programNote = program.programId
+      ? " DVC_PROGRAM_ID is prefilled."
+      : program.programIdInvalid
+        ? " DVC_PROGRAM_ID is set but is not a UUID, so the form will not use it."
+        : "";
     return {
       status: 200,
       body: {
         configured: true,
         missing: [],
-        message: "DVC_SERVICE_URL is set. Submit forwards program_id and attestation_data to that service.",
+        programId: program.programId,
+        programIdInvalid: program.programIdInvalid,
+        message: `DVC_SERVICE_URL is set. Submit forwards program_id and attestation_data to that service.${programNote}`,
       },
     };
   }
@@ -43,6 +58,8 @@ export function dvcAvailability(raw: string | undefined): DvcHandlerResult {
       body: {
         configured: false,
         missing: ["DVC_SERVICE_URL"],
+        programId: program.programId,
+        programIdInvalid: program.programIdInvalid,
         message: parsed.message,
       },
     };
@@ -54,6 +71,8 @@ export function dvcAvailability(raw: string | undefined): DvcHandlerResult {
       configured: false,
       missing: [],
       invalid: true,
+      programId: program.programId,
+      programIdInvalid: program.programIdInvalid,
       message: parsed.message,
     },
   };
