@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { interpretDvcResult, type DvcShape } from "@/lib/dvc-document";
 import { saveTask } from "@/lib/history";
 import type { ComputeTask } from "@/lib/types";
 import { dvcStatusFromPayload, type UiStatus } from "@/lib/verify-state";
@@ -17,6 +18,14 @@ export type Availability = {
   missing?: string[];
   invalid?: boolean;
   message?: string;
+  programId?: string | null;
+  programIdInvalid?: boolean;
+};
+
+export type PreparedDvc = {
+  attestationData: string;
+  shape: DvcShape;
+  privateFieldNames: string[];
 };
 
 type SubmitBody = {
@@ -56,9 +65,19 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
-export function ComputePanel({ initialAvailability }: { initialAvailability: Availability }) {
+export function ComputePanel({
+  initialAvailability,
+  initialProgramId = "",
+  prepared = null,
+  prepareMessage = null,
+}: {
+  initialAvailability: Availability;
+  initialProgramId?: string;
+  prepared?: PreparedDvc | null;
+  prepareMessage?: string | null;
+}) {
   const [availability, setAvailability] = useState<Availability | null>(initialAvailability);
-  const [programId, setProgramId] = useState("");
+  const [programId, setProgramId] = useState(initialProgramId);
   const [attestationData, setAttestationData] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<UiStatus>("pending");
@@ -75,7 +94,12 @@ export function ComputePanel({ initialAvailability }: { initialAvailability: Ava
       try {
         const res = await fetch("/api/dvc/status");
         const body = (await res.json()) as Availability;
-        if (!cancelled) setAvailability(body);
+        if (!cancelled) {
+          setAvailability(body);
+          if (typeof body.programId === "string" && body.programId) {
+            setProgramId((current) => (current.trim() ? current : body.programId ?? current));
+          }
+        }
       } catch {
         // The server snapshot stays. A failed status refresh does not invent a new state.
       }
@@ -108,15 +132,10 @@ export function ComputePanel({ initialAvailability }: { initialAvailability: Ava
       const httpOk = body.ok === true || (body.ok === undefined && res.ok);
       const next = dvcStatusFromPayload(httpOk, payload);
       const serviceStatus = readServiceStatus(payload);
+      const interpreted = interpretDvcResult(body);
       setResponse(body);
       setStatus(next);
-      setMessage(
-        next === "done"
-          ? "The DVC service reported status done. ProofLab did not verify the SNARK."
-          : serviceStatus
-            ? `DVC service status: ${serviceStatus}.`
-            : null,
-      );
+      setMessage(interpreted.detail);
       remember({
         kind: "dvc-computation",
         updatedAt: new Date().toISOString(),
@@ -124,6 +143,7 @@ export function ComputePanel({ initialAvailability }: { initialAvailability: Ava
         serviceTaskId: taskId,
         status: next === "pending" ? "pending" : next,
         serviceStatus,
+        proverVerified: interpreted.proverVerified,
         error: next === "failed" && isRecord(payload) && typeof payload.error === "string" ? payload.error : null,
         response: body,
       });
@@ -135,12 +155,13 @@ export function ComputePanel({ initialAvailability }: { initialAvailability: Ava
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!configured || busy) return;
+    if (!configured || busy || prepareMessage) return;
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
     setBusy(true);
     setStatus("pending");
+    const attestationPayload = prepared?.attestationData ?? attestationData;
     setMessage("Submitting program_id and attestation_data to /submitTask.");
     setResponse(null);
     setServiceTaskId(null);
@@ -151,7 +172,7 @@ export function ComputePanel({ initialAvailability }: { initialAvailability: Ava
       const res = await fetch("/api/dvc/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ program_id: programId.trim(), attestation_data: attestationData }),
+        body: JSON.stringify({ program_id: programId.trim(), attestation_data: attestationPayload }),
         signal: controller.signal,
       });
       const body = (await res.json()) as SubmitBody;
@@ -173,6 +194,7 @@ export function ComputePanel({ initialAvailability }: { initialAvailability: Ava
           serviceTaskId: null,
           status: "failed",
           serviceStatus: null,
+          proverVerified: null,
           error: body.message ?? "submit failed",
           response: body,
         });
@@ -182,6 +204,7 @@ export function ComputePanel({ initialAvailability }: { initialAvailability: Ava
       const taskId = readTaskId(body.payload);
       const serviceStatus = readServiceStatus(body.payload);
       const next = dvcStatusFromPayload(true, body.payload);
+      const interpreted = interpretDvcResult(body);
       setServiceTaskId(taskId);
       setStatus(next);
       setMessage(
@@ -196,6 +219,7 @@ export function ComputePanel({ initialAvailability }: { initialAvailability: Ava
         serviceTaskId: taskId,
         status: next,
         serviceStatus,
+        proverVerified: interpreted.proverVerified,
         error: null,
         response: body,
       });
@@ -253,6 +277,28 @@ export function ComputePanel({ initialAvailability }: { initialAvailability: Ava
         </Callout>
       ) : null}
 
+      {availability?.programIdInvalid ? (
+        <Callout title="DVC_PROGRAM_ID is invalid" tone="warning">
+          DVC_PROGRAM_ID is set but is not a UUID from POST /uploadProgram. The form will not use it.
+        </Callout>
+      ) : null}
+
+      {prepareMessage ? (
+        <Callout title="This attestation cannot be submitted as DVC input" tone="warning">
+          {prepareMessage}
+        </Callout>
+      ) : null}
+
+      {prepared ? (
+        <Callout title="Attestation data is ready">
+          Shape {prepared.shape}. Private fields sent with the task and not shown here:{" "}
+          {prepared.privateFieldNames.join(", ") || "none"}. A Network document needs an ELF built
+          against zktls-att-verification branch network-succinct. An enterprise-aes document needs an
+          ELF built against the main branch of that crate. The published DVC-Demo Binance ELF expects
+          the Network shape.
+        </Callout>
+      ) : null}
+
       <form className="grid gap-5" onSubmit={(event) => void onSubmit(event)}>
         <div className="grid gap-2">
           <Label htmlFor="programId">program_id</Label>
@@ -261,36 +307,40 @@ export function ComputePanel({ initialAvailability }: { initialAvailability: Ava
             name="programId"
             value={programId}
             onChange={(event) => setProgramId(event.target.value)}
-            disabled={!configured || busy}
+            disabled={!configured || busy || Boolean(prepareMessage)}
             spellCheck={false}
             placeholder="UUID from uploadProgram"
             className="h-10 font-mono"
           />
           <p className="text-sm leading-6 text-muted-foreground">
             The DVC-Demo service returns a UUID from POST /uploadProgram. ProofLab does not upload
-            ELF files and does not invent a program id.
+            ELF files and does not invent a program id. DVC_PROGRAM_ID prefills this field when it
+            is a UUID.
           </p>
         </div>
-        <div className="grid gap-2">
-          <Label htmlFor="attestationData">attestation_data</Label>
-          <Textarea
-            id="attestationData"
-            name="attestationData"
-            value={attestationData}
-            onChange={(event) => setAttestationData(event.target.value)}
-            disabled={!configured || busy}
-            spellCheck={false}
-            placeholder='{"public_data":[],"private_data":{},"verification_type":"HASH_COMPARISON"}'
-            className="min-h-40 font-mono"
-          />
-          <p className="text-sm leading-6 text-muted-foreground">
-            JSON forwarded as the attestation_data form field. A Network DVC payload uses
-            public_data, private_data, and verification_type. An enterprise zkTLS attestation is a
-            different object. ProofLab does not rewrite one into the other.
-          </p>
-        </div>
+        {prepared || prepareMessage ? null : (
+          <div className="grid gap-2">
+            <Label htmlFor="attestationData">attestation_data</Label>
+            <Textarea
+              id="attestationData"
+              name="attestationData"
+              value={attestationData}
+              onChange={(event) => setAttestationData(event.target.value)}
+              disabled={!configured || busy}
+              spellCheck={false}
+              placeholder='{"verification_type":"HASH_COMPARSION","public_data":[],"private_data":{}}'
+              className="min-h-40 font-mono"
+            />
+            <p className="text-sm leading-6 text-muted-foreground">
+              JSON forwarded as the attestation_data form field. Network DVC uses verification_type
+              HASH_COMPARSION or AES_DECRYPTION, public_data, and private_data. The verifier spells
+              the hash type HASH_COMPARSION. An enterprise ciphertext attestation is submitted only
+              from a verified result that includes aes_key, as public_data plus private_data.aes_key.
+            </p>
+          </div>
+        )}
         <div className="flex flex-wrap gap-3">
-          <Button type="submit" size="lg" disabled={!configured || busy}>
+          <Button type="submit" size="lg" disabled={!configured || busy || Boolean(prepareMessage)}>
             {busy ? "Contacting DVC service" : "Submit task"}
           </Button>
           <Button
@@ -315,6 +365,17 @@ export function ComputePanel({ initialAvailability }: { initialAvailability: Ava
       </form>
 
       {message ? <p className="text-sm leading-6 text-muted-foreground">{message}</p> : null}
+      {response !== null ? (
+        <p className="text-sm leading-6">
+          Prover verification: {interpretDvcResult(response).proverVerified ? "verified" : "not verified"}
+        </p>
+      ) : null}
+      {response !== null && interpretDvcResult(response).publicValues ? (
+        <JsonBlock
+          value={interpretDvcResult(response).publicValues}
+          label="Prover public values"
+        />
+      ) : null}
       {response !== null ? <JsonBlock value={response} label="DVC service response" /> : null}
     </div>
   );

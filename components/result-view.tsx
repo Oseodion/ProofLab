@@ -48,7 +48,7 @@ export function ResultView({ id }: { id: string }) {
     <PageShell
       eyebrow="zkTLS attestation"
       title="Attestation result"
-      lede="Metadata from the attestation returned by startAttestation, plus the boolean from verifyAttestation. This page does not describe a DVC computation proof."
+      lede="Metadata from the attestation returned by startAttestation, plus the boolean from verifyAttestation. A verified record can continue to a DVC submit when the attestation is a document the prover accepts."
     >
       <AttestationResult task={task} />
     </PageShell>

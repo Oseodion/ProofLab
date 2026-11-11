@@ -67,6 +67,7 @@ export function HistoryList() {
               <p className="mt-2 break-all text-sm text-muted-foreground">
                 Service task {task.serviceTaskId ?? "not assigned"}
                 {task.serviceStatus ? ` · status ${task.serviceStatus}` : ""}
+                {task.proverVerified === true ? " · prover verified" : ""}
               </p>
             )}
           </div>

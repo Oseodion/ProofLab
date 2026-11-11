@@ -2,7 +2,7 @@
 
 ProofLab is a developer studio for the Primus zkTLS attestation flow, plus a separate panel for DVC (data verification and computation). The tagline is the product rule: From web data attestation to verifiable computation without confusing the two
 
-A verified result on this site means `verifyAttestation` returned `true`. That is a zkTLS attestation. It is not a zkVM computation proof. The computation panel talks to a DVC service only when `DVC_SERVICE_URL` is set, and it shows that service’s JSON as the service returned it.
+A verified attestation on this site means `verifyAttestation` returned `true`. That is a zkTLS attestation. A verified computation is a separate check: the DVC service returned status `done`, a proof fixture, and the Succinct prover line `Successfully verified proof!`. The computation panel talks to a DVC service only when `DVC_SERVICE_URL` is set.
 
 This is an independent demo. It is not a Primus Labs product and does not imply an endorsement.
 
@@ -13,7 +13,7 @@ This is an independent demo. It is not a Primus Labs product and does not imply 
 | Pages, copy, history, validation | Live | Live |
 | `POST /api/primus/sign` | `503` naming `PRIMUS_APP_ID` and/or `PRIMUS_APP_SECRET` | `PrimusZKTLS.init(appId, appSecret)` then `sign(signParams)` |
 | Browser attestation | The form renders. `init` fails until the [Primus Extension](https://chromewebstore.google.com/detail/primus/oeiomhmbaapihbilkfkhmlajkeegnjhe) is installed and `NEXT_PUBLIC_PRIMUS_APP_ID` is set | Extension flow from the [production example](https://github.com/primus-labs/zktls-demo/tree/main/production-example) |
-| DVC submit / poll | Unavailable. The UI names the missing variable `DVC_SERVICE_URL` | Forwards `program_id` and `attestation_data` to `POST /submitTask` and polls `GET /getResult?task_id=` |
+| DVC submit / poll | Unavailable. The UI names the missing variable `DVC_SERVICE_URL` | Forwards `program_id` and `attestation_data` to `POST /submitTask` and polls `GET /getResult?task_id=`. `DVC_PROGRAM_ID` prefills the program UUID when set |
 
 App ID and App Secret come from [Dev Hub projects](https://dev.primuslabs.xyz/myDevelopment/myProjects). Template IDs come from the [marketplace](https://dev.primuslabs.xyz/marketplace) or from a template on your project. The server App ID and `NEXT_PUBLIC_PRIMUS_APP_ID` must be the same project.
 
@@ -54,7 +54,7 @@ Do not put `PRIMUS_APP_SECRET` in a `NEXT_PUBLIC_` variable. The SDK’s `sign()
 
 `vercel.json` is not required. Vercel detects Next.js.
 
-The DVC prover does not belong on a serverless function. `dvc-service` runs a Succinct prover binary and stores programs on disk. Host that process on a VM or call an endpoint you are allowed to use, then set `DVC_SERVICE_URL` to its base URL. A public example host appears in DVC-Demo (`https://dvcapi.primuslabs.xyz:38080`). This app does not assume that host will accept anonymous traffic.
+The DVC prover does not belong on a serverless function. `dvc-service` in [DVC-Demo](https://github.com/primus-labs/DVC-Demo/tree/main/dvc-service) runs a Succinct prover binary and stores programs on disk. Host that process on a VM, then set `DVC_SERVICE_URL` to its base URL. The current DVC-Demo `.env.example` uses `http://localhost:38080`. `dvcapi.primuslabs.xyz` does not resolve, and this app does not assume a public prover.
 
 Production Primus projects can require a domain whitelist. Add the deployed origin in Dev Hub or attestation requests fail at the extension or attestors.
 
@@ -82,16 +82,22 @@ Optional Route Handlers /api/dvc/*
   GET  /getResult?task_id=
 ```
 
-Signing follows `production-example/server/index.js`. The browser follows `production-example/client/src/primus.js`, except the signed request is sent as JSON in a POST body instead of a query string, so large requests are not stuffed into a URL. `sign()` still receives the raw `AttRequest.toJsonString()` value.
+Signing follows `production-example/server/index.js`. The browser follows `production-example/client/src/primus.js`, except the signed request is sent as JSON in a POST body instead of a query string, so large requests are not stuffed into a URL. `sign()` still receives the raw `AttRequest.toJsonString()` value. When “Retain the response for computation” is checked, the request sets `allJsonResponseFlag` to `"true"`. After `verifyAttestation` returns true, `getAllJsonResponse(requestid)` and `getPrivateData(requestid)` are kept in this tab’s `sessionStorage`, not in the localStorage history record.
 
-DVC forwarding follows `DVC-Demo/dvc-client/src/prover_client.js`:
+DVC forwarding follows `DVC-Demo/dvc-client/src/prover_client.js` and `dvc-service/main.py`:
 
+- `POST {DVC_SERVICE_URL}/uploadProgram` is how you create a `program_id`. ProofLab does not upload ELF files.
 - `POST {DVC_SERVICE_URL}/submitTask` with form fields `program_id` and `attestation_data`
 - `GET {DVC_SERVICE_URL}/getResult?task_id=`
 
-`program_id` in that service is a UUID from `POST /uploadProgram`. ProofLab does not upload ELF files. Build and upload the guest yourself, then paste the returned id.
+`attestation_data` has two shapes, both defined in [zktls-att-verification](https://github.com/primus-labs/zktls-att-verification):
 
-An enterprise attestation object (`recipient`, `request`, `reponseResolve`, `signatures`, …) is not the DVC `attestation_data` document (`public_data`, `private_data`, `verification_type`). The compute form does not rewrite one into the other.
+- Network (`network-succinct` branch, used by the DVC-Demo Succinct guest): `verification_type` is `HASH_COMPARSION` or `AES_DECRYPTION`, `public_data` is an array, and `private_data` holds `plain_json_response` or `aes_key`. The hash type is spelled `HASH_COMPARSION` in that crate.
+- Enterprise AES (`main` branch): `public_data` is the enterprise attestation object and `private_data` is `{ "aes_key": "<32 hex chars>" }`.
+
+A verified studio attestation is submitted from its result page only when it is already one of those documents, or when the SDK’s `privateData` contains that `aes_key` and the public object is an enterprise attestation. A reveal such as `{"screen_name":"web3_tech_"}` stays a zkTLS attestation. ProofLab does not re-encode its signature or invent private fields.
+
+The service marks a task `done` even when the prover writes no fixture. ProofLab reports prover verification only when status is `done`, `proof_fixture` contains `proof` and `vk`, and the prover stdout contains `Successfully verified proof!`. That line is the prover’s own `verify` call. This app does not run an SP1 verifier.
 
 ### Routes
 
@@ -120,14 +126,27 @@ These need a real project and are not faked in CI:
 - `sign()` producing a signature the extension will accept for your template
 - `startAttestation` completing against a marketplace or project template
 - `verifyAttestation` returning `true` on a fresh attestation
-- A DVC prove: `DVC_SERVICE_URL`, an uploaded Succinct ELF `program_id`, and `attestation_data` in the shape that guest expects, then a SNARK checked by that program’s verifier contract
+- A DVC prove on your own host: `DVC_SERVICE_URL`, an uploaded Succinct ELF `program_id`, and `attestation_data` in the shape that guest expects
 
 ProofLab does not ship a mock SNARK, a sample `testdata` attestation presented as new, or a hardcoded verifier address.
+
+## Host the DVC prover
+
+ProofLab does not mint `program_id` and it does not run the prover. From [DVC-Demo](https://github.com/primus-labs/DVC-Demo):
+
+1. Install [SP1](https://docs.succinct.xyz/docs/sp1/getting-started/install) and build `dvc-succinct-program` to an ELF, then build `dvc-succinct-prover`.
+2. Copy `dvc-service/.env.example` to `.env` and set `SUCCINCT_PROVER_BIN` to that prover binary.
+3. `pip install -r dvc-service/requirements.txt` and `uvicorn main:app --host 0.0.0.0 --port 38080`.
+4. `POST /uploadProgram` with the ELF. The response `program_id` is a UUID. Put that UUID in `DVC_PROGRAM_ID`.
+5. Set `DVC_SERVICE_URL` to the base URL, for example `http://127.0.0.1:38080`. On Vercel this must be a URL the deployment can reach. Do not put a secret in either variable.
+6. For a Network document, the ELF must be the DVC-Demo guest (`zktls-att-verification` branch `network-succinct`). `verification_type` must be `HASH_COMPARSION` or `AES_DECRYPTION`. For an enterprise ciphertext attestation plus `aes_key`, build the guest against `zktls-att-verification` `main` instead. The published Binance ELF will not verify an enterprise reveal.
+
+A reveal template such as X Account Ownership puts the field in `attestation.data`. The result page explains why that object is not submitted.
 
 ## Known limitations
 
 - `verifyAttestation` checks the attestor signature against the address in `@primuslabs/zktls-js-sdk`. Predicate checks (balance, score, URL allowlist) stay with your program.
-- Service status `done` means the DVC service said `done`. This app does not verify the SNARK.
+- Service status `done` means the DVC service said `done`. Prover verification is a separate line and requires the proof fixture plus `Successfully verified proof!`.
 - History, including revealed attestation fields, stays in this browser’s `localStorage` until you remove it or paste it into the compute form.
 - The attest form leaves `computeMode` at the SDK default `normal`.
 - The free-tier note in Primus enterprise docs (100 proofs per app id) is not displayed as a live quota. This app cannot read that counter.

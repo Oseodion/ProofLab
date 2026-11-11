@@ -1,3 +1,4 @@
+import { DvcFromAttestation } from "@/components/dvc-from-attestation";
 import { JsonBlock } from "@/components/json-block";
 import { StatusPill } from "@/components/status-pill";
 import { summarizeAttestation } from "@/lib/attestation-summary";
@@ -88,6 +89,10 @@ export function AttestationResult({ task }: { task: AttestationTask }) {
 
       {task.attestation !== null ? (
         <JsonBlock value={task.attestation} label="Attestation JSON" />
+      ) : null}
+
+      {task.verifyResult === true ? (
+        <DvcFromAttestation taskId={task.id} attestation={task.attestation} />
       ) : null}
     </article>
   );

@@ -21,19 +21,19 @@ const ASSUMPTIONS = [
   },
   {
     title: "DVC is a different proof",
-    body: "A computation proof is the SNARK from the zkVM guest. The guest verifies attestation data and then runs a predicate. ProofLab will submit to POST /submitTask and poll GET /getResult only when DVC_SERVICE_URL is set. Service status done means the service said done. This app does not verify the SNARK, and it does not ship a verifier contract address.",
+    body: "A computation proof is the SNARK from the zkVM guest. The guest verifies attestation data and then runs a predicate. ProofLab submits to POST /submitTask and polls GET /getResult only when DVC_SERVICE_URL is set. It marks prover verification only when the payload includes a proof fixture and the Succinct prover line Successfully verified proof!. ProofLab does not run an SP1 verifier and does not ship a verifier contract address.",
   },
   {
     title: "Hosted proving is separate infrastructure",
-    body: "SP1 proving and the DVC service are heavy processes. They are a poor fit for a Vercel function. Run them on a VM or use an endpoint you are allowed to call. Access to the sample host in DVC-Demo is not assumed to be open.",
+    body: "SP1 proving and the DVC service are heavy processes. They are a poor fit for a Vercel function. Run dvc-service on a VM, upload an ELF with POST /uploadProgram, and set DVC_SERVICE_URL to that base URL. The current DVC-Demo example URL is http://localhost:38080. No public prover host is assumed.",
   },
 ];
 
 const LIMITS = [
   "No mock prover output is shown as a real SNARK. SP1_PROVER=mock is not wired up.",
   "Sample files such as DVC-Demo testdata are not loaded or presented as a fresh attestation.",
-  "The attest form leaves computeMode at the SDK default, normal. It does not switch the request into a zkVM ciphertext mode.",
-  "Enterprise attestation objects and Network DVC attestation_data objects are not converted into each other.",
+  "The attest form leaves computeMode at the SDK default, normal, and resultType at plain. Checking Retain the response for computation sets allJsonResponseFlag to true.",
+  "A reveal attestation is not rewritten into a Network DVC document. ProofLab submits a document only when it is already HASH_COMPARSION or AES_DECRYPTION, or when an enterprise ciphertext attestation includes a 32-hex aes_key.",
   "History is localStorage in this browser. Revealed attestation fields stay on the device unless you paste them into the computation form.",
   "Production Primus projects can require a domain whitelist. A local or preview origin may be rejected by the extension or attestors until it is listed.",
   "Primus enterprise docs describe a free tier of 100 proofs per app id. This app does not display a remaining quota it cannot read.",
@@ -89,6 +89,12 @@ export default function TrustPage() {
             </li>
             <li>
               <ExternalLink href={links.dvcDemo}>DVC-Demo</ExternalLink>
+            </li>
+            <li>
+              <ExternalLink href={links.dvcIntro}>DVC-Intro</ExternalLink>
+            </li>
+            <li>
+              <ExternalLink href={links.dvcAttestationVerify}>zktls-att-verification</ExternalLink>
             </li>
             <li>
               <ExternalLink href={links.devHubProjects}>Dev Hub projects</ExternalLink>

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createBrowserPrimus, publicPrimusAppId } from "@/lib/client/browser-primus";
+import { saveDvcMaterial } from "@/lib/client/dvc-material";
 import { runAttestation, type AttestationRunResult } from "@/lib/client/run-attestation";
 import { postSign } from "@/lib/client/sign-client";
 import { saveTask } from "@/lib/history";
@@ -48,6 +49,7 @@ export function AttestStudio({ defaultTemplateId }: { defaultTemplateId: string 
   const [userAddress, setUserAddress] = useState("");
   const [additionParams, setAdditionParams] = useState("");
   const [algorithmType, setAlgorithmType] = useState<AlgorithmType>("proxytls");
+  const [retainForDvc, setRetainForDvc] = useState(true);
   const [phase, setPhase] = useState<AttestPhase>("idle");
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +79,7 @@ export function AttestStudio({ defaultTemplateId }: { defaultTemplateId: string 
     try {
       const primus = await createBrowserPrimus();
       result = await runAttestation(
-        { templateId, userAddress, additionParams, algorithmType },
+        { templateId, userAddress, additionParams, algorithmType, retainForDvc },
         { appId, platform, primus, sign: postSign },
         setPhase,
       );
@@ -88,6 +90,7 @@ export function AttestStudio({ defaultTemplateId }: { defaultTemplateId: string 
         attestation: null,
         error: caught instanceof Error ? caught.message : "Could not load the Primus SDK.",
         phase: "init",
+        dvcMaterial: null,
       };
     }
 
@@ -108,11 +111,21 @@ export function AttestStudio({ defaultTemplateId }: { defaultTemplateId: string 
     };
 
     const stored = saveTask(task);
-    if (stored === "session") {
-      setStorageNote("localStorage rejected the write. This result was kept for the current tab only.");
-    } else if (stored === "none") {
-      setStorageNote("This browser blocked history storage. The result is shown below and was not saved.");
+    const notes: string[] = [];
+    if (result.status === "verified" && result.dvcMaterial) {
+      const kept = saveDvcMaterial(task.id, result.dvcMaterial);
+      if (kept === "none") {
+        notes.push(
+          "This tab could not store the DVC private fields. The computation step will not see them.",
+        );
+      }
     }
+    if (stored === "session") {
+      notes.push("localStorage rejected the write. This result was kept for the current tab only.");
+    } else if (stored === "none") {
+      notes.push("This browser blocked history storage. The result is shown below and was not saved.");
+    }
+    if (notes.length > 0) setStorageNote(notes.join(" "));
 
     setPhase(result.phase);
     setError(result.status === "verified" ? null : result.error);
@@ -211,6 +224,25 @@ export function AttestStudio({ defaultTemplateId }: { defaultTemplateId: string 
             <ExternalLink href={links.productionExample}>production example</ExternalLink>). mpctls
             is MPC-TLS.
           </p>
+        </div>
+
+        <div className="flex items-start gap-3">
+          <input
+            id="retainForDvc"
+            name="retainForDvc"
+            type="checkbox"
+            checked={retainForDvc}
+            onChange={(event) => setRetainForDvc(event.target.checked)}
+            className="mt-1"
+          />
+          <div>
+            <Label htmlFor="retainForDvc">Retain the response for computation</Label>
+            <p className="text-sm leading-6 text-muted-foreground">
+              Sets allJsonResponseFlag to true on the signed request, then keeps getAllJsonResponse
+              and getPrivateData in this tab only. A reveal template still puts plaintext in the
+              public attestation. Turn this off to sign the same request shape as before.
+            </p>
+          </div>
         </div>
 
         {error ? (
